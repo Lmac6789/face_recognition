@@ -6,8 +6,6 @@ from matplotlib import pyplot
 from numpy import savez_compressed
 from numpy import asarray
 from mtcnn.mtcnn import MTCNN
-from numpy import load
-from numpy import expand_dims
 from numpy import asarray
 from numpy import savez_compressed
 from keras.models import load_model
@@ -98,6 +96,8 @@ def extract_embedding():
         # standardize pixel values across channels (global)
         mean, std = face_pixels.mean(), face_pixels.std()
         face_pixels = (face_pixels - mean) / std
+        print(face_pixels.shape)
+        print("----")
         # transform face into one sample
         samples = expand_dims(face_pixels, axis=0)
         # make prediction to get embedding
@@ -147,16 +147,27 @@ def predict():
     # fit model
     model = SVC(kernel='linear', probability=True)
     model.fit(trainX, trainy)
+
+
+
+
     # test model on a random example from the test dataset
     selection = choice([i for i in range(testX.shape[0])])
     random_face_pixels = testX_faces[selection]
     random_face_emb = testX[selection]
+
     random_face_class = testy[selection]
     random_face_name = out_encoder.inverse_transform([random_face_class])
+
+
+
     # prediction for the face
     samples = expand_dims(random_face_emb, axis=0)
+
     yhat_class = model.predict(samples)
     yhat_prob = model.predict_proba(samples)
+
+
     # get name
     class_index = yhat_class[0]
     class_probability = yhat_prob[0, class_index] * 100
@@ -171,7 +182,7 @@ def predict():
 
 
 # create_file_npz()
-
+#
 # extract_embedding()
 
 predict()

@@ -154,6 +154,7 @@ def predict():
     # test model on a random example from the test dataset
     selection = choice([i for i in range(testX.shape[0])])
     random_face_pixels = testX_faces[selection]
+
     random_face_emb = testX[selection]
 
     random_face_class = testy[selection]
@@ -170,6 +171,7 @@ def predict():
 
     # get name
     class_index = yhat_class[0]
+    print(class_index)
     class_probability = yhat_prob[0, class_index] * 100
     predict_names = out_encoder.inverse_transform(yhat_class)
     print('Predicted: %s (%.3f)' % (predict_names[0], class_probability))

@@ -25,8 +25,9 @@ from matplotlib import pyplot
 def take_face(name):
     cam = cv2.VideoCapture(0)
     detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
-    path_train = 'data/train/' + name + '/'
-    path_val = 'data/val/' + name + '/'
+    standard_name = "_".join(name.split(' '))
+    path_train = 'data/train/' + standard_name + '/'
+    path_val = 'data/val/' + standard_name + '/'
     makedirs(path_val, exist_ok=True)
     makedirs(path_train, exist_ok=True)
     sampleNum = 1
@@ -100,6 +101,7 @@ def create_array_and_label():
     # save arrays to one file in compressed format
     savez_compressed('faces-dataset.npz', trainX, trainy, testX, testy)
 
+
 def get_embedding(model, face_pixels):
     # scale pixel values
     face_pixels = face_pixels.astype('float32')
@@ -112,8 +114,8 @@ def get_embedding(model, face_pixels):
     yhat = model.predict(samples)
     return yhat[0]
 
-def extract_embedding():
 
+def extract_embedding():
     # load the face dataset
     data = load('faces-dataset.npz')
     trainX, trainy, testX, testy = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
@@ -140,7 +142,9 @@ def extract_embedding():
     # save arrays to one file in compressed format
     savez_compressed('faces-embeddings.npz', newTrainX, trainy, newTestX, testy)
 
-def build_model():
+
+def predict():
+    # train model
     data = load('faces-dataset.npz')
     testX_faces = data['arr_2']
     # load face embeddings
@@ -159,86 +163,55 @@ def build_model():
     model = SVC(kernel='linear', probability=True)
     model.fit(trainX, trainy)
 
-    # test model on a random example from the test dataset
-    selection = choice([i for i in range(testX.shape[0])])
-    random_face_pixels = testX_faces[selection]
-    random_face_emb = testX[selection]
+    # take face and image has face
+    available_images = list()
+    cam = cv2.ViedoeCapture(0)
+    count_img = 0
+    while(count_img == 1):
+        ret, img = cam.read()
+        detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = detector.detectMultiScale(gray, 1.3, 5)
+        if faces:
+            available_images.append(faces[0])
+            available_images.append(img)
+            count_img += 1
+        continue
 
-    random_face_class = testy[selection]
-    random_face_name = out_encoder.inverse_transform([random_face_class])
+    # predict face
+    (x, y, w, h), img = available_images[0], available_images[1]
+    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    face_img = img[y:y + h, x:x + w]
+    face = cv2.resize(face_img, (160, 160), interpolation=cv2.INTER_AREA)
+    facenet_model = load_model('facenet_keras.h5')
+    embedding_pred_face = get_embedding(facenet_model, face)
 
-    # prediction for the face
-    samples = expand_dims(random_face_emb, axis=0)
-
+    samples = expand_dims(embedding_pred_face, axis=0)
     yhat_class = model.predict(samples)
     yhat_prob = model.predict_proba(samples)
-
-    # get name
     class_index = yhat_class[0]
     class_probability = yhat_prob[0, class_index] * 100
-    predict_names = out_encoder.inverse_transform(yhat_class)
-    print('Predicted: %s (%.3f)' % (predict_names[0], class_probability))
-    print('Expected: %s' % random_face_name[0])
-    # plot for fun
-    pyplot.imshow(random_face_pixels)
-    title = '%s (%.3f)' % (predict_names[0], class_probability)
-    pyplot.title(title)
-    pyplot.show()
-
-    # all_faces = list()
-    # img = cv2.imread('data/train/tran_thanh/test.jpg')
-    # detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
-    # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # faces = detector.detectMultiScale(gray, 1.3, 5)
-    # for (x, y, w, h) in faces:
-    #     cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
-    #     face_img = img[y:y + h, x:x + w]
-    #     face = cv2.resize(face_img, (160, 160), interpolation=cv2.INTER_AREA)
-    #     all_faces.append(face)
-    # face = all_faces[0]
-    #
-    # model = load_model('facenet_keras.h5')
-    # embedding_pred_face = get_embedding(model, face)
-
-
-
-    # samples = expand_dims(embedding_pred_face, axis=0)
-
-    # yhat_class = model.predict(samples)
-    #
-    # yhat_prob = model.predict_proba(samples)
-    #
-    #
-    #
-    # # # get name
-    # # class_index = yhat_class[0]
-    # # class_probability = yhat_prob[0, class_index] * 100
-    # # predict_names = out_encoder.inverse_transform(yhat_class)
-    # # print('Predicted: %s (%.3f)' % (predict_names[0], class_probability))
-    # #
-    # # # plot for fun
-    # # pyplot.imshow(all_faces[0])
-    # # title = '%s (%.3f)' % (predict_names[0], class_probability)
-    # # pyplot.title(title)
-    # # pyplot.show()
-    # #
-    # cv2.imshow('frame', all_faces[0])
-    # cv2.waitKey(0)
+    if class_probability > 70:
+        predict_names = out_encoder.inverse_transform(yhat_class)
+        print('Predicted: %s (%.3f)' % (predict_names[0], class_probability))
+        display_name = "".join(str(predict_names[0]).split("_"))
+        cv2.putText(img, display_name+"    "+str(class_probability), (x, y+h+30), cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2)
+        cv2.imshow('frame', img)
+        if cv2.waitKey(0) & 0xFF == ord('q'):
+            exit()
+        cv2.destroyAllWindows()
+    else:
+        cv2.putText(img, "Not found user", (x, y + h + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2)
+        cv2.imshow('frame', img)
+        if cv2.waitKey(0) & 0xFF == ord('q'):
+            exit()
+        cv2.destroyAllWindows()
 
 
 
 def save_data(name):
-    # take_face(name)
-    # create_array_and_label()
-    # extract_embedding()
-    pass
+    take_face(name)
+    create_array_and_label()
+    extract_embedding()
 
-def predict():
-
-    build_model()
-
-# save_data(name='123')
-predict()
-
-# extract_embedding()
 

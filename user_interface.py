@@ -13,14 +13,16 @@ root.geometry('300x500')
 def register():
     name = simpledialog.askstring(title="Entry name", prompt="What's your name")
     save_data(name)
-
-    response = messagebox.showinfo("Information", "Register successfully")
-
-
+    messagebox.showinfo("Information", "Register successfully")
 
 
 def check():
-    pass
+    try:
+        predict()
+        if 0xFF == ord('q'):
+            root.quit()
+    except ValueError:
+        messagebox.showinfo("Information", "Not found user")
 
 
 logo = ImageTk.PhotoImage(Image.open('logo.jpg'))

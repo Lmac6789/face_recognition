@@ -5,21 +5,14 @@ import cv2
 from numpy import savez_compressed, asarray
 # face detection for the 5 Celebrity Faces Dataset
 from os.path import isdir
-from PIL import Image
-from matplotlib import pyplot
-from numpy import savez_compressed
-from numpy import asarray
-from mtcnn.mtcnn import MTCNN
 from numpy import asarray
 from numpy import savez_compressed
 from keras.models import load_model
-from random import choice
 from numpy import load
 from numpy import expand_dims
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import Normalizer
 from sklearn.svm import SVC
-from matplotlib import pyplot
 
 
 def take_face(name):
@@ -164,25 +157,33 @@ def predict():
     model.fit(trainX, trainy)
 
     # take face and image has face
-    available_images = list()
-    cam = cv2.ViedoeCapture(0)
-    count_img = 0
-    while(count_img == 1):
+    image = list()
+    face_img_list = list()
+    cam = cv2.VideoCapture(0)
+    detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
+    flag = True
+    count = 0
+    while(flag):
+        count +=1
+        print(count)
         ret, img = cam.read()
-        detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
+        print(000)
+        print(img.shape)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = detector.detectMultiScale(gray, 1.3, 5)
-        if faces:
-            available_images.append(faces[0])
-            available_images.append(img)
-            count_img += 1
-        continue
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            face_img = img[y:y + h, x:x + w]
+            face = cv2.resize(face_img, (160, 160), interpolation=cv2.INTER_AREA)
+            face_img_list.append(face)
+            image.append(img)
+            cv2.imshow('frame', img)
+            cv2.waitKey(1000)
+        if len(face_img_list) == 1:
+            flag = False
+    img = image[0]
+    face = face_img_list[0]
 
-    # predict face
-    (x, y, w, h), img = available_images[0], available_images[1]
-    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
-    face_img = img[y:y + h, x:x + w]
-    face = cv2.resize(face_img, (160, 160), interpolation=cv2.INTER_AREA)
     facenet_model = load_model('facenet_keras.h5')
     embedding_pred_face = get_embedding(facenet_model, face)
 
@@ -191,7 +192,9 @@ def predict():
     yhat_prob = model.predict_proba(samples)
     class_index = yhat_class[0]
     class_probability = yhat_prob[0, class_index] * 100
+
     if class_probability > 70:
+        print(222)
         predict_names = out_encoder.inverse_transform(yhat_class)
         print('Predicted: %s (%.3f)' % (predict_names[0], class_probability))
         display_name = "".join(str(predict_names[0]).split("_"))
@@ -206,7 +209,6 @@ def predict():
         if cv2.waitKey(0) & 0xFF == ord('q'):
             exit()
         cv2.destroyAllWindows()
-
 
 
 def save_data(name):
